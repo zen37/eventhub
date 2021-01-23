@@ -16,11 +16,13 @@ import (
 
 type yamlCfg struct {
 	ConnEventHub string `yaml:"connEventHub"`
+	File string `yaml:"logPartition"`
 }
 
 var (
 	cfg     yamlCfg
 	connStr string
+	file string
 )
 
 func init() {
@@ -35,7 +37,9 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	
 	connStr = cfg.ConnEventHub
+	file = cfg.File
 }
 
 func main() {
@@ -140,13 +144,6 @@ func getEventHubInfo(ctx context.Context, hub *eventhub.Hub) {
 
 func saveEventHubInfo(ctx context.Context, hub *eventhub.Hub) error {
 
-	/*
-		hubManager, err := eventhub.NewHubManagerFromConnectionString(connStr)
-		if err != nil {
-			log.Fatal(err)
-		}
-		//fmt.Print("Host: ", hubManager.Host)
-	*/
 
 	// get info about the hub
 	infoHub, err := hub.GetRuntimeInformation(ctx)
@@ -155,9 +152,6 @@ func saveEventHubInfo(ctx context.Context, hub *eventhub.Hub) error {
 		//log.Fatalf("failed to get runtime info: %s\n", err)
 	}
 
-	//	fmt.Printf("\nPath: %v\nCreated at: %v\nPartition Count: %v\nPartition IDs: %v\n",
-	//		infoHub.Path, infoHub.CreatedAt, infoHub.PartitionCount, infoHub.PartitionIDs)
-
 	for _, p := range infoHub.PartitionIDs {
 		// get info about the partitions
 		infoPart, err := hub.GetPartitionInformation(ctx, p)
@@ -165,13 +159,13 @@ func saveEventHubInfo(ctx context.Context, hub *eventhub.Hub) error {
 			return err
 			//log.Fatalf("failed to get partition info: %s\n", err)
 		}
-		path := "../files/partition" + infoPart.PartitionID + ".log"
+
 		// If the file doesn't exist, create it, or append to the file
-		f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return err
 		}
-		//fmt.Printf("PartitionID: %v\nBeginningSequenceNumber: %v\nLastSequenceNumber: %v\nLastEnqueuedOffset: %v\nLastEnqueuedTimeUtc: %v\n",
+		
 		sep := "|"
 		s := infoPart.PartitionID + sep + strconv.FormatInt(infoPart.BeginningSequenceNumber, 10) +
 			sep + strconv.FormatInt(infoPart.LastSequenceNumber, 10) + sep + infoPart.LastEnqueuedOffset +
