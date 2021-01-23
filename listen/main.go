@@ -1,6 +1,5 @@
 package main
 
-//https://pkg.go.dev/github.com/Azure/azure-event-hubs-go/v3#Hub
 import (
 	"context"
 	"fmt"
@@ -9,7 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"time"
+//	"time"
 
 	eventhub "github.com/Azure/azure-event-hubs-go/v3"
 	"gopkg.in/yaml.v2"
@@ -41,7 +40,9 @@ func init() {
 
 func main() {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
+
 	defer cancel()
 
 	hub, err := eventhub.NewHubFromConnectionString(connStr)
@@ -60,17 +61,18 @@ func main() {
 
 	signal.Notify(exit, os.Interrupt, os.Kill)
 
-	<-exit
+	<-exit //waiting to receive something, anything
+
+	fmt.Println(".....stopping.....")
+
+	err = saveEventHubInfo(ctx, hub)
+	if err != nil {
+		log.Fatalln("saveEventHubInfo", err)
+	}
 
 	err = hub.Close(ctx)
 	if err != nil {
 		fmt.Println(err)
-	}
-
-	fmt.Println(".....stopping.....")
-	err = saveEventHubInfo(ctx, hub)
-	if err != nil {
-		log.Fatalln("saveEventHubInfo", err)
 	}
 
 }
@@ -94,7 +96,9 @@ func listen(ctx context.Context, hub *eventhub.Hub) error {
 		// Receive blocks while attempting to connect to hub, then runs until listenerHandle.Close() is called
 		// <- listenerHandle.Done() signals listener has stopped
 		// listenerHandle.Err() provides the last error the receiver encountered
-		_, err := hub.Receive(ctx, partitionID, handler, eventhub.ReceiveWithLatestOffset())
+
+		//_, err := hub.Receive(ctx, partitionID, handler, eventhub.ReceiveWithLatestOffset())
+		_, err := hub.Receive(ctx, partitionID, handler)
 		if err != nil {
 			//fmt.Println(err)
 			return err
