@@ -8,7 +8,8 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-//	"time"
+
+	//	"time"
 
 	eventhub "github.com/Azure/azure-event-hubs-go/v3"
 	"gopkg.in/yaml.v2"
@@ -16,13 +17,14 @@ import (
 
 type yamlCfg struct {
 	ConnEventHub string `yaml:"connEventHub"`
-	File string `yaml:"logPartition"`
+	File         string `yaml:"partitionData"`
 }
 
 var (
 	cfg     yamlCfg
 	connStr string
-	file string
+	file    string
+	exit chan os.Signal
 )
 
 func init() {
@@ -37,12 +39,16 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	connStr = cfg.ConnEventHub
 	file = cfg.File
+
+	exit = make(chan os.Signal, 1)
+
 }
 
 func main() {
+
 
 	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -56,15 +62,17 @@ func main() {
 
 	//	getEventHubInfo(ctx, hub)
 
-	exit := make(chan os.Signal, 1)
+	//exit := make(chan os.Signal, 1)
+
+	go func() {
+		signal.Notify(exit, os.Interrupt, os.Kill)
+	}()
 
 	err = listen(ctx, hub)
 	if err != nil {
 		fmt.Printf("failed to get runtime info: %s\n", err)
 	}
-
-	signal.Notify(exit, os.Interrupt, os.Kill)
-
+    // signal.Notify(exit, os.Interrupt, os.Kill)
 	<-exit //waiting to receive something, anything
 
 	fmt.Println(".....stopping.....")
@@ -90,7 +98,7 @@ func listen(ctx context.Context, hub *eventhub.Hub) error {
 	}
 
 	handler := func(c context.Context, event *eventhub.Event) error {
-		fmt.Println(string(event.Data))
+		fmt.Println(string(event.Data), event.PartitionKey, event.ID, *event.SystemProperties.Offset )
 		return nil
 	}
 
@@ -144,7 +152,6 @@ func getEventHubInfo(ctx context.Context, hub *eventhub.Hub) {
 
 func saveEventHubInfo(ctx context.Context, hub *eventhub.Hub) error {
 
-
 	// get info about the hub
 	infoHub, err := hub.GetRuntimeInformation(ctx)
 	if err != nil {
@@ -165,7 +172,7 @@ func saveEventHubInfo(ctx context.Context, hub *eventhub.Hub) error {
 		if err != nil {
 			return err
 		}
-		
+
 		sep := "|"
 		s := infoPart.PartitionID + sep + strconv.FormatInt(infoPart.BeginningSequenceNumber, 10) +
 			sep + strconv.FormatInt(infoPart.LastSequenceNumber, 10) + sep + infoPart.LastEnqueuedOffset +
